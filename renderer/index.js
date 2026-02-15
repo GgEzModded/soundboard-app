@@ -1,9 +1,154 @@
 const soundboard = document.getElementById("soundboard");
 const addSoundBtn = document.getElementById("addSound");
-const allAudio = []; // keep track of all Audio objects
-let globalVolume = 1; // 0.0 - 1.0
-let isMuted = false;
+const allAudio = [];
+let currentPlayingAudio = null;
+let currentPlayingCard = null;
 
+// Panel elements
+const audioPanel = document.getElementById("audio-panel");
+const currentSoundName = document.getElementById("current-sound-name");
+const panelVolume = document.getElementById("panel-volume");
+const volumeDisplay = document.getElementById("volume-display");
+const btnPlay = document.getElementById("btn-play");
+const btnPause = document.getElementById("btn-pause");
+const btnStop = document.getElementById("btn-stop");
+const btnForward = document.getElementById("btn-forward");
+const btnBackward = document.getElementById("btn-backward");
+const progressFill = document.getElementById("progress-fill");
+const currentTimeDisplay = document.getElementById("current-time");
+const totalTimeDisplay = document.getElementById("total-time");
+const progressBar = document.querySelector(".progress-bar");
+
+// Checkboxes
+const checkStopOthers = document.getElementById("check-stop-others");
+const checkMuteOthers = document.getElementById("check-mute-others");
+const checkLoop = document.getElementById("check-loop");
+
+// Format time helper
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Update panel UI
+function updatePanelUI() {
+  if (!currentPlayingAudio) {
+    audioPanel.classList.add("hidden");
+    currentSoundName.textContent = "No Sound Playing";
+    btnPlay.classList.remove("hidden");
+    btnPause.classList.add("hidden");
+    progressFill.style.width = "0%";
+    currentTimeDisplay.textContent = "0:00";
+    totalTimeDisplay.textContent = "0:00";
+    return;
+  }
+
+  audioPanel.classList.remove("hidden");
+  
+  if (currentPlayingAudio.paused) {
+    btnPlay.classList.remove("hidden");
+    btnPause.classList.add("hidden");
+  } else {
+    btnPlay.classList.add("hidden");
+    btnPause.classList.remove("hidden");
+  }
+}
+
+// Setup panel controls
+function setupPanelControls(audio, card, name) {
+  currentPlayingAudio = audio;
+  currentPlayingCard = card;
+  currentSoundName.textContent = name;
+  panelVolume.value = audio.volume * 100;
+  volumeDisplay.textContent = Math.round(audio.volume * 100);
+  
+  updatePanelUI();
+
+  // Update progress
+  const updateProgress = () => {
+    if (audio.duration) {
+      const percent = (audio.currentTime / audio.duration) * 100;
+      progressFill.style.width = percent + "%";
+      currentTimeDisplay.textContent = formatTime(audio.currentTime);
+      totalTimeDisplay.textContent = formatTime(audio.duration);
+    }
+  };
+
+  audio.addEventListener("timeupdate", updateProgress);
+  audio.addEventListener("loadedmetadata", updateProgress);
+}
+
+// Panel button handlers
+btnPlay.onclick = () => {
+  if (currentPlayingAudio) {
+    currentPlayingAudio.play();
+    updatePanelUI();
+  }
+};
+
+btnPause.onclick = () => {
+  if (currentPlayingAudio) {
+    currentPlayingAudio.pause();
+    updatePanelUI();
+  }
+};
+
+btnStop.onclick = () => {
+  if (currentPlayingAudio) {
+    currentPlayingAudio.pause();
+    currentPlayingAudio.currentTime = 0;
+    if (currentPlayingCard) {
+      currentPlayingCard.classList.remove("playing");
+    }
+    currentPlayingAudio = null;
+    currentPlayingCard = null;
+    updatePanelUI();
+  }
+};
+
+btnForward.onclick = () => {
+  if (currentPlayingAudio) {
+    currentPlayingAudio.currentTime = Math.min(
+      currentPlayingAudio.currentTime + 10,
+      currentPlayingAudio.duration
+    );
+  }
+};
+
+btnBackward.onclick = () => {
+  if (currentPlayingAudio) {
+    currentPlayingAudio.currentTime = Math.max(currentPlayingAudio.currentTime - 10, 0);
+  }
+};
+
+// Progress bar click
+progressBar.onclick = (e) => {
+  if (currentPlayingAudio && currentPlayingAudio.duration) {
+    const rect = progressBar.getBoundingClientRect();
+    const percent = (e.clientX - rect.left) / rect.width;
+    currentPlayingAudio.currentTime = percent * currentPlayingAudio.duration;
+  }
+};
+
+// Volume control
+panelVolume.oninput = () => {
+  const volume = panelVolume.value / 100;
+  volumeDisplay.textContent = panelVolume.value;
+  if (currentPlayingAudio) {
+    currentPlayingAudio.volume = volume;
+  }
+};
+
+// Checkbox handlers
+document.querySelectorAll('.checkbox-item').forEach(item => {
+  item.addEventListener('click', () => {
+    const checkbox = item.querySelector('.checkbox');
+    checkbox.classList.toggle('checked');
+  });
+});
+
+// Context menu
 function createContextMenu(options, x, y) {
   const existing = document.getElementById("context-menu");
   if (existing) existing.remove();
@@ -91,23 +236,64 @@ function createSoundCard(name, filePath) {
   imageWrapper.appendChild(imageIcon);
 
   let isPlaying = false;
+  
   imageWrapper.addEventListener("click", () => {
+    // Stop other sounds if checkbox is checked
+    if (checkStopOthers.classList.contains("checked")) {
+      allAudio.forEach(a => {
+        if (a !== audio) {
+          a.pause();
+          a.currentTime = 0;
+        }
+      });
+      document.querySelectorAll(".sound-card").forEach(c => {
+        if (c !== card) c.classList.remove("playing");
+      });
+    }
+
+    // Mute other sounds if checkbox is checked
+    if (checkMuteOthers.classList.contains("checked")) {
+      allAudio.forEach(a => {
+        if (a !== audio) {
+          a.volume = 0;
+        } else {
+          a.volume = panelVolume.value / 100;
+        }
+      });
+    }
+
     if (!isPlaying) {
       audio.currentTime = 0;
       audio.play();
       isPlaying = true;
       card.classList.add("playing");
+      setupPanelControls(audio, card, name);
     } else {
       audio.pause();
       audio.currentTime = 0;
       isPlaying = false;
       card.classList.remove("playing");
+      if (currentPlayingAudio === audio) {
+        currentPlayingAudio = null;
+        currentPlayingCard = null;
+        updatePanelUI();
+      }
     }
   });
 
   audio.addEventListener("ended", () => {
-    isPlaying = false;
-    card.classList.remove("playing");
+    if (checkLoop.classList.contains("checked") && currentPlayingAudio === audio) {
+      audio.currentTime = 0;
+      audio.play();
+    } else {
+      isPlaying = false;
+      card.classList.remove("playing");
+      if (currentPlayingAudio === audio) {
+        currentPlayingAudio = null;
+        currentPlayingCard = null;
+        updatePanelUI();
+      }
+    }
   });
 
   const volume = document.createElement("input");
@@ -118,11 +304,20 @@ function createSoundCard(name, filePath) {
   volume.className = "volume-slider";
   volume.oninput = (e) => {
     audio.volume = e.target.value / 100;
+    if (currentPlayingAudio === audio) {
+      panelVolume.value = e.target.value;
+      volumeDisplay.textContent = e.target.value;
+    }
   };
 
   removeBtn.onclick = async (e) => {
     e.stopPropagation();
     audio.pause();
+    if (currentPlayingAudio === audio) {
+      currentPlayingAudio = null;
+      currentPlayingCard = null;
+      updatePanelUI();
+    }
     await window.electronAPI.removeSound(filePath);
     card.remove();
   };
@@ -147,6 +342,9 @@ function createSoundCard(name, filePath) {
       if (newName) {
         label.textContent = newName;
         await window.electronAPI.renameSound(filePath, newName);
+        if (currentPlayingAudio === audio) {
+          currentSoundName.textContent = newName;
+        }
       }
       card.replaceChild(label, input);
     };
@@ -167,6 +365,11 @@ function createSoundCard(name, filePath) {
           label: "Remove",
           action: async () => {
             audio.pause();
+            if (currentPlayingAudio === audio) {
+              currentPlayingAudio = null;
+              currentPlayingCard = null;
+              updatePanelUI();
+            }
             await window.electronAPI.removeSound(filePath);
             card.remove();
           }
@@ -174,7 +377,13 @@ function createSoundCard(name, filePath) {
         {
           type: "slider",
           value: audio.volume,
-          onchange: (v) => { audio.volume = v; }
+          onchange: (v) => {
+            audio.volume = v;
+            if (currentPlayingAudio === audio) {
+              panelVolume.value = v * 100;
+              volumeDisplay.textContent = Math.round(v * 100);
+            }
+          }
         }
       ],
       e.clientX,
@@ -205,23 +414,3 @@ addSoundBtn.onclick = async () => {
     createSoundCard(sound.name, sound.filePath);
   }
 };
-
-const globalSlider = document.getElementById("globalVolume");
-const muteBtn = document.getElementById("muteBtn");
-
-globalSlider.oninput = () => {
-  globalVolume = globalSlider.value / 100;
-  updateAllVolumes();
-};
-
-muteBtn.onclick = () => {
-  isMuted = !isMuted;
-  muteBtn.textContent = isMuted ? "Unmute" : "Mute";
-  updateAllVolumes();
-};
-
-function updateAllVolumes() {
-  allAudio.forEach((audio) => {
-    audio.volume = (isMuted ? 0 : globalVolume) * 1;
-  });
-}

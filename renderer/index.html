@@ -14,8 +14,75 @@
   </div>
 
   <aside id="side-panel">
-    <h2>Panel</h2>
-    <p>Add controls, notes, or now-playing info here.</p>
+    <div id="audio-panel" class="audio-panel hidden">
+      <div class="icon-section">
+        <div style="position: relative; display: inline-block;">
+          <div class="sound-icon">
+            <div class="speaker-icon"></div>
+          </div>
+          <div class="edit-icon"></div>
+        </div>
+        <div class="shortcut" id="current-sound-name">No Sound Playing</div>
+      </div>
+
+      <div class="volume-section">
+        <div class="volume-label">
+          <div class="volume-icon"></div>
+          <span>Volume</span>
+        </div>
+        <input type="range" id="panel-volume" class="panel-volume-slider" min="0" max="100" value="100">
+        <div class="volume-value" id="volume-display">100</div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">
+          <div class="reproduction-icon"></div>
+          Reproduction Mode
+        </div>
+        <div class="control-buttons">
+          <button class="control-btn backward" id="btn-backward" title="Rewind 10s"></button>
+          <button class="control-btn play" id="btn-play" title="Play"></button>
+          <button class="control-btn pause hidden" id="btn-pause" title="Pause"></button>
+          <button class="control-btn stop" id="btn-stop" title="Stop"></button>
+          <button class="control-btn forward" id="btn-forward" title="Forward 10s"></button>
+        </div>
+        
+        <div class="progress-section">
+          <div class="time-display">
+            <span id="current-time">0:00</span>
+            <span id="total-time">0:00</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="progress-fill"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">
+          <div class="options-icon">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+          Reproduction Options
+        </div>
+        <div class="checkbox-group">
+          <label class="checkbox-item">
+            <div class="checkbox" id="check-stop-others"></div>
+            <span class="checkbox-label">Stop Other Sounds</span>
+          </label>
+          <label class="checkbox-item">
+            <div class="checkbox" id="check-mute-others"></div>
+            <span class="checkbox-label">Mute Other Sounds</span>
+          </label>
+          <label class="checkbox-item">
+            <div class="checkbox" id="check-loop"></div>
+            <span class="checkbox-label">Loop Current</span>
+          </label>
+        </div>
+      </div>
+    </div>
   </aside>
 
   <script src="index.js"></script>
