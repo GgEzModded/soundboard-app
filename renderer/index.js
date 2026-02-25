@@ -103,6 +103,9 @@ function setupPanelControls(audio, card, name) {
   currentSoundName.textContent = name;
   panelVolume.value = audio.volume * 100;
   volumeDisplay.textContent = Math.round(audio.volume * 100);
+  if (audio._cardVolumeSlider) {
+    audio._cardVolumeSlider.value = Math.round(audio.volume * 100);
+  }
   
   updatePanelUI();
 
@@ -124,6 +127,9 @@ function setupPanelControls(audio, card, name) {
 btnPlay.onclick = () => {
   if (currentPlayingAudio) {
     currentPlayingAudio.play();
+    if (currentPlayingCard) {
+      currentPlayingCard.classList.add("playing");
+    }
     updatePanelUI();
   }
 };
@@ -131,6 +137,9 @@ btnPlay.onclick = () => {
 btnPause.onclick = () => {
   if (currentPlayingAudio) {
     currentPlayingAudio.pause();
+    if (currentPlayingCard) {
+      currentPlayingCard.classList.remove("playing");
+    }
     updatePanelUI();
   }
 };
@@ -178,6 +187,9 @@ panelVolume.oninput = () => {
   volumeDisplay.textContent = panelVolume.value;
   if (currentPlayingAudio) {
     currentPlayingAudio.volume = volume;
+    if (currentPlayingAudio._cardVolumeSlider) {
+      currentPlayingAudio._cardVolumeSlider.value = panelVolume.value;
+    }
   }
 };
 
@@ -276,9 +288,9 @@ function createSoundCard(name, filePath) {
   imageIcon.textContent = "PLAY";
   imageWrapper.appendChild(imageIcon);
 
-  let isPlaying = false;
-  
   imageWrapper.addEventListener("click", () => {
+    const wasPlaying = !audio.paused;
+
     // Stop other sounds if checkbox is checked
     if (checkStopOthers.classList.contains("checked")) {
       allAudio.forEach(a => {
@@ -303,16 +315,14 @@ function createSoundCard(name, filePath) {
       });
     }
 
-    if (!isPlaying) {
+    if (!wasPlaying) {
       audio.currentTime = 0;
       audio.play();
-      isPlaying = true;
       card.classList.add("playing");
       setupPanelControls(audio, card, name);
     } else {
       audio.pause();
       audio.currentTime = 0;
-      isPlaying = false;
       card.classList.remove("playing");
       if (currentPlayingAudio === audio) {
         currentPlayingAudio = null;
@@ -327,7 +337,6 @@ function createSoundCard(name, filePath) {
       audio.currentTime = 0;
       audio.play();
     } else {
-      isPlaying = false;
       card.classList.remove("playing");
       if (currentPlayingAudio === audio) {
         currentPlayingAudio = null;
@@ -343,6 +352,7 @@ function createSoundCard(name, filePath) {
   volume.max = 100;
   volume.value = 100;
   volume.className = "volume-slider";
+  audio._cardVolumeSlider = volume;
   volume.oninput = (e) => {
     audio.volume = e.target.value / 100;
     if (currentPlayingAudio === audio) {
