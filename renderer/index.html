@@ -20,7 +20,7 @@
   </aside>
   <div id="main">
     <div id="top-panel">
-      <h1>Soundboard</h1>
+      <h1 id="top-panel-title">Soundboard</h1>
       <button id="addSound">+ Add Sound</button>
     </div>
     <div id="soundboard"></div>
@@ -95,6 +95,21 @@
           </label>
         </div>
       </div>
+    </div>
+
+    <div class="global-volume-section">
+      <div class="global-volume-header">
+        <span>Global Volume</span>
+        <span id="global-volume-display">100</span>
+      </div>
+      <input
+        type="range"
+        id="global-volume"
+        class="panel-volume-slider"
+        min="0"
+        max="100"
+        value="100"
+      >
     </div>
   </aside>
 

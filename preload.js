@@ -3,6 +3,8 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("electronAPI", {
   addSound: () => ipcRenderer.invoke("add-sound"),
   loadSounds: () => ipcRenderer.invoke("load-sounds"),
+  loadAppTitle: () => ipcRenderer.invoke("load-app-title"),
+  saveAppTitle: (title) => ipcRenderer.invoke("save-app-title", title),
   removeSound: (filePath) => ipcRenderer.invoke("remove-sound", filePath),
   renameSound: (filePath, newName) =>
     ipcRenderer.invoke("rename-sound", filePath, newName),

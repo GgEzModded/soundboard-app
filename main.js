@@ -5,18 +5,24 @@ const fs = require("fs");
 const dataDir = path.join(__dirname, "data");
 const localDataPath = path.join(dataDir, "sounds.local.json");
 const exampleDataPath = path.join(dataDir, "sounds.example.json");
-const defaultData = { sounds: [] };
+const DEFAULT_APP_TITLE = "Soundboard";
+const defaultData = { sounds: [], appTitle: DEFAULT_APP_TITLE };
 
 function normalizeData(raw) {
   if (Array.isArray(raw)) {
-    return { sounds: raw };
+    return { sounds: raw, appTitle: DEFAULT_APP_TITLE };
   }
 
   if (raw && Array.isArray(raw.sounds)) {
-    return { sounds: raw.sounds };
+    const appTitle =
+      typeof raw.appTitle === "string" && raw.appTitle.trim()
+        ? raw.appTitle.trim()
+        : DEFAULT_APP_TITLE;
+
+    return { sounds: raw.sounds, appTitle };
   }
 
-  return { sounds: [] };
+  return { sounds: [], appTitle: DEFAULT_APP_TITLE };
 }
 
 function readDataFile(filePath) {
@@ -43,7 +49,7 @@ function loadData() {
   if (exampleData) return exampleData;
 
   writeLocalData(defaultData);
-  return { sounds: [] };
+  return { sounds: [], appTitle: DEFAULT_APP_TITLE };
 }
 
 function loadWritableData() {
@@ -51,7 +57,7 @@ function loadWritableData() {
   if (localData) return localData;
 
   const exampleData = readDataFile(exampleDataPath);
-  return exampleData || { sounds: [] };
+  return exampleData || { sounds: [], appTitle: DEFAULT_APP_TITLE };
 }
 
 function createWindow() {
@@ -78,7 +84,7 @@ function createWindow() {
 
 ipcMain.handle("add-sound", async () => {
   const result = await dialog.showOpenDialog({
-    properties: ["openFile"],
+    properties: ["openFile", "multiSelections"],
     filters: [
       { name: "Audio Files", extensions: ["mp3", "wav", "ogg"] }
     ]
@@ -86,20 +92,44 @@ ipcMain.handle("add-sound", async () => {
 
   if (result.canceled) return null;
 
-  const filePath = result.filePaths[0];
-  const name = path.basename(filePath);
-
   const data = loadWritableData();
-  data.sounds.push({ name, filePath });
+  const added = result.filePaths.map((filePath) => {
+    const name = path.parse(filePath).name;
+    data.sounds.push({ name, filePath });
+    return { name, filePath };
+  });
 
   writeLocalData(data);
 
-  return { name, filePath };
+  return added;
 });
 
 ipcMain.handle("load-sounds", () => {
   const data = loadData();
   return data.sounds;
+});
+
+ipcMain.handle("load-app-title", () => {
+  const data = loadData();
+  return data.appTitle || DEFAULT_APP_TITLE;
+});
+
+ipcMain.handle("save-app-title", (event, appTitle) => {
+  try {
+    const data = loadWritableData();
+    const normalizedTitle =
+      typeof appTitle === "string" && appTitle.trim()
+        ? appTitle.trim()
+        : DEFAULT_APP_TITLE;
+
+    data.appTitle = normalizedTitle;
+    writeLocalData(data);
+
+    return normalizedTitle;
+  } catch (err) {
+    console.error("Error saving app title:", err);
+    return DEFAULT_APP_TITLE;
+  }
 });
 
 ipcMain.handle("remove-sound", (event, filePath) => {
