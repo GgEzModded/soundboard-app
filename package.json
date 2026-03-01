@@ -19,7 +19,8 @@
     },
     "files": [
       "**/*",
-      "!node_modules/.cache"
+      "!node_modules/.cache",
+      "!data/sounds.local.json"
     ],
     "icon": "build/icon.png",
     "win": {

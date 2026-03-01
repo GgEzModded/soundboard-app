@@ -3,7 +3,9 @@ const path = require("path");
 const fs = require("fs");
 
 const dataDir = path.join(__dirname, "data");
-const localDataPath = path.join(dataDir, "sounds.local.json");
+const userDataDir = app.getPath("userData");
+const localDataPath = path.join(userDataDir, "sounds.local.json");
+const legacyLocalDataPath = path.join(dataDir, "sounds.local.json");
 const exampleDataPath = path.join(dataDir, "sounds.example.json");
 const DEFAULT_APP_TITLE = "Soundboard";
 const defaultData = { sounds: [], appTitle: DEFAULT_APP_TITLE };
@@ -37,11 +39,34 @@ function readDataFile(filePath) {
   }
 }
 
+function ensureUserDataDir() {
+  if (!fs.existsSync(userDataDir)) {
+    fs.mkdirSync(userDataDir, { recursive: true });
+  }
+}
+
+function migrateLegacyData() {
+  if (fs.existsSync(localDataPath)) {
+    return;
+  }
+
+  if (!fs.existsSync(legacyLocalDataPath)) {
+    return;
+  }
+
+  const legacyData = readDataFile(legacyLocalDataPath);
+  if (legacyData) {
+    writeLocalData(legacyData);
+  }
+}
+
 function writeLocalData(data) {
+  ensureUserDataDir();
   fs.writeFileSync(localDataPath, JSON.stringify(data, null, 2));
 }
 
 function loadData() {
+  migrateLegacyData();
   const localData = readDataFile(localDataPath);
   if (localData) return localData;
 
@@ -53,6 +78,7 @@ function loadData() {
 }
 
 function loadWritableData() {
+  migrateLegacyData();
   const localData = readDataFile(localDataPath);
   if (localData) return localData;
 
