@@ -71,13 +71,9 @@ function applyAppTitle(title) {
   const normalizedTitle =
     typeof title === "string" && title.trim() ? title.trim() : DEFAULT_APP_TITLE;
 
-  if (topPanelTitle) {
-    topPanelTitle.textContent = normalizedTitle;
-  }
   if (titlebarTitle) {
     titlebarTitle.textContent = normalizedTitle;
   }
-  document.title = normalizedTitle;
 }
 
 async function persistAppTitle(title) {
