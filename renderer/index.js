@@ -28,6 +28,98 @@ const progressBar = document.querySelector(".progress-bar");
 const editSoundNameBtn = document.querySelector(".edit-icon");
 const globalVolumeSlider = document.getElementById("global-volume");
 const globalVolumeDisplay = document.getElementById("global-volume-display");
+const appBody = document.body;
+const leftSettingsBtn = document.getElementById("left-settings-btn");
+const leftSettingsMenu = document.getElementById("left-settings-menu");
+const toggleLeftPanelThemeBtn = document.getElementById("toggle-left-panel-theme");
+const CHARMING_THEME_CLASS = "charming-theme";
+const APP_THEME_STORAGE_KEY = "appThemeMode";
+
+function setLeftSettingsMenuOpen(isOpen) {
+  if (!leftSettingsMenu) {
+    return;
+  }
+
+  leftSettingsMenu.classList.toggle("is-open", isOpen);
+  leftSettingsMenu.setAttribute("aria-hidden", String(!isOpen));
+  if (leftSettingsBtn) {
+    leftSettingsBtn.setAttribute("aria-expanded", String(isOpen));
+  }
+}
+
+function updateLeftPanelThemeButtonLabel() {
+  if (!appBody || !toggleLeftPanelThemeBtn) {
+    return;
+  }
+
+  const isCharmingThemeEnabled = appBody.classList.contains(CHARMING_THEME_CLASS);
+  toggleLeftPanelThemeBtn.textContent = isCharmingThemeEnabled
+    ? "Use Default Theme"
+    : "Use Purple-Pink Theme";
+}
+
+if (appBody) {
+  try {
+    const savedThemeMode = window.localStorage.getItem(APP_THEME_STORAGE_KEY);
+    if (savedThemeMode === "charming") {
+      appBody.classList.add(CHARMING_THEME_CLASS);
+    }
+  } catch (err) {
+    console.error("Unable to load app theme:", err);
+  }
+}
+
+if (toggleLeftPanelThemeBtn && appBody) {
+  toggleLeftPanelThemeBtn.addEventListener("click", () => {
+    const isCharmingThemeEnabled = appBody.classList.toggle(CHARMING_THEME_CLASS);
+    try {
+      window.localStorage.setItem(
+        APP_THEME_STORAGE_KEY,
+        isCharmingThemeEnabled ? "charming" : "default"
+      );
+    } catch (err) {
+      console.error("Unable to persist app theme:", err);
+    }
+
+    updateLeftPanelThemeButtonLabel();
+  });
+}
+
+if (leftSettingsBtn && leftSettingsMenu) {
+  setLeftSettingsMenuOpen(false);
+
+  leftSettingsBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const shouldOpen = !leftSettingsMenu.classList.contains("is-open");
+    setLeftSettingsMenuOpen(shouldOpen);
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!leftSettingsMenu.classList.contains("is-open")) {
+      return;
+    }
+
+    const target = event.target;
+    if (!(target instanceof Node)) {
+      setLeftSettingsMenuOpen(false);
+      return;
+    }
+
+    if (leftSettingsMenu.contains(target) || leftSettingsBtn.contains(target)) {
+      return;
+    }
+
+    setLeftSettingsMenuOpen(false);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && leftSettingsMenu.classList.contains("is-open")) {
+      setLeftSettingsMenuOpen(false);
+    }
+  });
+}
+
+updateLeftPanelThemeButtonLabel();
 
 if (minimizeWindowBtn) {
   minimizeWindowBtn.addEventListener("click", () => {
