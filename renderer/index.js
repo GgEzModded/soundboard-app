@@ -6,6 +6,7 @@ const minimizeWindowBtn = document.getElementById("window-minimize");
 const maximizeWindowBtn = document.getElementById("window-maximize");
 const closeWindowBtn = document.getElementById("window-close");
 const allAudio = [];
+const soundHotkeyMap = new Map();
 let currentPlayingAudio = null;
 let currentPlayingCard = null;
 let globalVolume = 1;
@@ -252,6 +253,133 @@ function formatTime(seconds) {
 
 function clampVolume(value) {
   return Math.min(1, Math.max(0, value));
+}
+
+function isTypingTarget(target) {
+  if (!target) {
+    return false;
+  }
+  const tagName = target.tagName;
+  return (
+    target.isContentEditable ||
+    tagName === "INPUT" ||
+    tagName === "TEXTAREA" ||
+    tagName === "SELECT"
+  );
+}
+
+function normalizeHotkeyCombination(rawValue) {
+  if (typeof rawValue !== "string") {
+    return "";
+  }
+
+  const parts = rawValue
+    .split("+")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (parts.length === 0) {
+    return "";
+  }
+
+  const modifiers = [];
+  let keyPart = "";
+
+  parts.forEach((part) => {
+    const normalized = part.toLowerCase();
+    if (normalized === "ctrl" || normalized === "control") {
+      if (!modifiers.includes("Ctrl")) modifiers.push("Ctrl");
+      return;
+    }
+    if (normalized === "alt" || normalized === "option") {
+      if (!modifiers.includes("Alt")) modifiers.push("Alt");
+      return;
+    }
+    if (normalized === "shift") {
+      if (!modifiers.includes("Shift")) modifiers.push("Shift");
+      return;
+    }
+    if (
+      normalized === "meta" ||
+      normalized === "cmd" ||
+      normalized === "command" ||
+      normalized === "win"
+    ) {
+      if (!modifiers.includes("Meta")) modifiers.push("Meta");
+      return;
+    }
+    keyPart = part;
+  });
+
+  const normalizedKey = keyPart
+    ? keyPart.length === 1
+      ? keyPart.toUpperCase()
+      : keyPart.charAt(0).toUpperCase() + keyPart.slice(1)
+    : "";
+
+  if (!normalizedKey) {
+    return "";
+  }
+
+  const orderedModifiers = ["Ctrl", "Alt", "Shift", "Meta"].filter((mod) =>
+    modifiers.includes(mod)
+  );
+
+  return [...orderedModifiers, normalizedKey].join("+");
+}
+
+function combinationFromKeyboardEvent(event) {
+  const key = event.key;
+  if (!key) {
+    return "";
+  }
+
+  const lower = key.toLowerCase();
+  if (["control", "shift", "alt", "meta"].includes(lower)) {
+    return "";
+  }
+
+  const modifiers = [];
+  if (event.ctrlKey) modifiers.push("Ctrl");
+  if (event.altKey) modifiers.push("Alt");
+  if (event.shiftKey) modifiers.push("Shift");
+  if (event.metaKey) modifiers.push("Meta");
+
+  let keyPart = "";
+  if (key === " ") {
+    keyPart = "Space";
+  } else if (key.length === 1) {
+    keyPart = key.toUpperCase();
+  } else {
+    keyPart = key.charAt(0).toUpperCase() + key.slice(1);
+  }
+
+  return [...modifiers, keyPart].join("+");
+}
+
+function hotkeyDisplayLabel(hotkey) {
+  return hotkey ? hotkey : "Add combination";
+}
+
+function rebuildHotkeyMap() {
+  soundHotkeyMap.clear();
+
+  document.querySelectorAll(".sound-card").forEach((card) => {
+    const hotkey = normalizeHotkeyCombination(card.dataset.hotkey || "");
+    if (!hotkey || soundHotkeyMap.has(hotkey)) {
+      return;
+    }
+    soundHotkeyMap.set(hotkey, card);
+  });
+}
+
+function isHotkeyTakenByOtherCard(hotkey, currentCard) {
+  return Array.from(document.querySelectorAll(".sound-card")).some((card) => {
+    if (card === currentCard) {
+      return false;
+    }
+    return normalizeHotkeyCombination(card.dataset.hotkey || "") === hotkey;
+  });
 }
 
 function applyAudioVolume(audio) {
@@ -578,13 +706,26 @@ function createContextMenu(options, x, y) {
   document.addEventListener("click", () => menu.remove(), { once: true });
 }
 
-function createSoundCard(name, filePath) {
+function createSoundCard(sound) {
+  const name = typeof sound?.name === "string" ? sound.name : "Untitled";
+  const filePath = typeof sound?.filePath === "string" ? sound.filePath : "";
+  const initialHotkey = normalizeHotkeyCombination(sound?.hotkey || "");
+  if (!filePath) {
+    return;
+  }
+
   const card = document.createElement("div");
   card.className = "sound-card sound-tile";
+  card.dataset.hotkey = initialHotkey;
 
   const label = document.createElement("div");
   label.className = "sound-name sound-title";
   label.textContent = name;
+
+  const hotkeyBadge = document.createElement("div");
+  hotkeyBadge.className = "sound-hotkey";
+  hotkeyBadge.textContent = hotkeyDisplayLabel(initialHotkey);
+  hotkeyBadge.classList.toggle("empty", !initialHotkey);
 
   const removeBtn = document.createElement("button");
   removeBtn.className = "remove-btn";
@@ -673,11 +814,90 @@ function createSoundCard(name, filePath) {
     }
     await window.electronAPI.removeSound(filePath);
     card.remove();
+    rebuildHotkeyMap();
   };
 
   label.ondblclick = (e) => {
     e.stopPropagation();
     startRename();
+  };
+
+  async function persistHotkey(hotkey) {
+    card.dataset.hotkey = hotkey;
+    hotkeyBadge.textContent = hotkeyDisplayLabel(hotkey);
+    hotkeyBadge.classList.toggle("empty", !hotkey);
+    rebuildHotkeyMap();
+
+    if (window.electronAPI && window.electronAPI.saveSoundHotkey) {
+      await window.electronAPI.saveSoundHotkey(filePath, hotkey);
+    }
+  }
+
+  function startHotkeyEdit() {
+    const previousHotkey = normalizeHotkeyCombination(card.dataset.hotkey || "");
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = previousHotkey;
+    input.placeholder = "Add combination";
+    input.className = "hotkey-input";
+
+    card.replaceChild(input, hotkeyBadge);
+    input.focus();
+    input.select();
+
+    let editFinished = false;
+    const finishEdit = async (shouldSave) => {
+      if (editFinished) {
+        return;
+      }
+
+      if (shouldSave) {
+        const normalizedHotkey = normalizeHotkeyCombination(input.value);
+        if (normalizedHotkey && isHotkeyTakenByOtherCard(normalizedHotkey, card)) {
+          window.alert("This combination is already assigned to another sound.");
+          input.focus();
+          input.select();
+          return;
+        }
+
+        await persistHotkey(normalizedHotkey);
+      }
+
+      editFinished = true;
+      card.replaceChild(hotkeyBadge, input);
+      hotkeyBadge.textContent = hotkeyDisplayLabel(card.dataset.hotkey || "");
+      hotkeyBadge.classList.toggle("empty", !card.dataset.hotkey);
+    };
+
+    input.onblur = () => finishEdit(false);
+    input.onkeydown = (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        finishEdit(true);
+        return;
+      }
+
+      if (e.key === "Escape") {
+        e.preventDefault();
+        finishEdit(false);
+        return;
+      }
+
+      if (e.key === "Backspace" || e.key === "Delete") {
+        return;
+      }
+
+      const capturedCombination = combinationFromKeyboardEvent(e);
+      if (capturedCombination) {
+        e.preventDefault();
+        input.value = capturedCombination;
+      }
+    };
+  }
+
+  hotkeyBadge.ondblclick = (e) => {
+    e.stopPropagation();
+    startHotkeyEdit();
   };
 
   function startRename() {
@@ -714,6 +934,7 @@ function createSoundCard(name, filePath) {
     createContextMenu(
       [
         { label: "Rename", action: () => { startRename(); } },
+        { label: "Add/Edit key combination", action: () => { startHotkeyEdit(); } },
         {
           label: "Remove",
           action: async () => {
@@ -727,6 +948,7 @@ function createSoundCard(name, filePath) {
             }
             await window.electronAPI.removeSound(filePath);
             card.remove();
+            rebuildHotkeyMap();
           }
         },
         {
@@ -753,13 +975,16 @@ function createSoundCard(name, filePath) {
   card.appendChild(removeBtn);
   card.appendChild(imageWrapper);
   card.appendChild(label);
+  card.appendChild(hotkeyBadge);
   card.appendChild(controls);
   soundboard.appendChild(card);
+
+  rebuildHotkeyMap();
 }
 
 window.electronAPI.loadSounds().then((sounds) => {
   sounds.forEach((sound) => {
-    createSoundCard(sound.name, sound.filePath);
+    createSoundCard(sound);
   });
 });
 
@@ -768,8 +993,34 @@ addSoundBtn.onclick = async () => {
   if (Array.isArray(sounds)) {
     sounds.forEach((sound) => {
       if (sound) {
-        createSoundCard(sound.name, sound.filePath);
+        createSoundCard(sound);
       }
     });
   }
 };
+
+document.addEventListener("keydown", (event) => {
+  if (event.defaultPrevented || event.repeat) {
+    return;
+  }
+
+  if (isTypingTarget(event.target)) {
+    return;
+  }
+
+  const currentCombination = normalizeHotkeyCombination(combinationFromKeyboardEvent(event));
+  if (!currentCombination) {
+    return;
+  }
+
+  const targetCard = soundHotkeyMap.get(currentCombination);
+  if (!targetCard) {
+    return;
+  }
+
+  event.preventDefault();
+  const soundImageWrapper = targetCard.querySelector(".sound-image-wrapper");
+  if (soundImageWrapper) {
+    soundImageWrapper.click();
+  }
+});

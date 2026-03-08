@@ -541,6 +541,30 @@ h1 {
   background: rgba(255, 255, 255, 0.06);
   color: #cfd6ff;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  user-select: none;
+  max-width: 120px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sound-hotkey.empty {
+  opacity: 0.72;
+  font-style: italic;
+}
+
+.hotkey-input {
+  width: 120px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  background: rgba(8, 12, 28, 0.8);
+  color: #e6e9f0;
+  font-size: 11px;
+  text-align: center;
+  outline: none;
 }
 
 /*PLAYING STATE*/
@@ -1151,6 +1175,12 @@ body.charming-theme .sound-hotkey {
   color: #ffdff8;
   background: rgba(255, 210, 244, 0.1);
   box-shadow: inset 0 0 0 1px rgba(255, 210, 244, 0.2);
+}
+
+body.charming-theme .hotkey-input {
+  border-color: rgba(255, 196, 241, 0.35);
+  background: rgba(34, 10, 44, 0.78);
+  color: #ffe9fb;
 }
 
 body.charming-theme .sound-tile.playing .sound-image-wrapper {

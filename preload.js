@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   removeSound: (filePath) => ipcRenderer.invoke("remove-sound", filePath),
   renameSound: (filePath, newName) =>
     ipcRenderer.invoke("rename-sound", filePath, newName),
+  saveSoundHotkey: (filePath, hotkey) =>
+    ipcRenderer.invoke("save-sound-hotkey", filePath, hotkey),
   closeWindow: () => ipcRenderer.send("window-close"),
   minimizeWindow: () => ipcRenderer.send("window-minimize"),
   toggleMaximize: () => ipcRenderer.send("window-toggle-maximize"),

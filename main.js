@@ -10,9 +10,35 @@ const exampleDataPath = path.join(dataDir, "sounds.example.json");
 const DEFAULT_APP_TITLE = "Soundboard";
 const defaultData = { sounds: [], appTitle: DEFAULT_APP_TITLE };
 
+function normalizeSoundEntry(rawSound) {
+  if (!rawSound || typeof rawSound !== "object") {
+    return null;
+  }
+
+  const filePath = typeof rawSound.filePath === "string" ? rawSound.filePath : "";
+  if (!filePath.trim()) {
+    return null;
+  }
+
+  return {
+    name:
+      typeof rawSound.name === "string" && rawSound.name.trim()
+        ? rawSound.name.trim()
+        : path.parse(filePath).name,
+    filePath: filePath.trim(),
+    hotkey:
+      typeof rawSound.hotkey === "string" && rawSound.hotkey.trim()
+        ? rawSound.hotkey.trim()
+        : ""
+  };
+}
+
 function normalizeData(raw) {
   if (Array.isArray(raw)) {
-    return { sounds: raw, appTitle: DEFAULT_APP_TITLE };
+    return {
+      sounds: raw.map(normalizeSoundEntry).filter(Boolean),
+      appTitle: DEFAULT_APP_TITLE
+    };
   }
 
   if (raw && Array.isArray(raw.sounds)) {
@@ -21,7 +47,10 @@ function normalizeData(raw) {
         ? raw.appTitle.trim()
         : DEFAULT_APP_TITLE;
 
-    return { sounds: raw.sounds, appTitle };
+    return {
+      sounds: raw.sounds.map(normalizeSoundEntry).filter(Boolean),
+      appTitle
+    };
   }
 
   return { sounds: [], appTitle: DEFAULT_APP_TITLE };
@@ -121,8 +150,9 @@ ipcMain.handle("add-sound", async () => {
   const data = loadWritableData();
   const added = result.filePaths.map((filePath) => {
     const name = path.parse(filePath).name;
-    data.sounds.push({ name, filePath });
-    return { name, filePath };
+    const soundEntry = { name, filePath, hotkey: "" };
+    data.sounds.push(soundEntry);
+    return soundEntry;
   });
 
   writeLocalData(data);
@@ -183,6 +213,22 @@ ipcMain.handle("rename-sound", (event, filePath, newName) => {
     writeLocalData(data);
   } catch (err) {
     console.error("Error renaming sound:", err);
+  }
+});
+
+ipcMain.handle("save-sound-hotkey", (event, filePath, hotkey) => {
+  try {
+    const data = loadWritableData();
+    const sound = data.sounds.find((entry) => entry.filePath === filePath);
+    if (!sound) {
+      return;
+    }
+
+    sound.hotkey =
+      typeof hotkey === "string" && hotkey.trim() ? hotkey.trim() : "";
+    writeLocalData(data);
+  } catch (err) {
+    console.error("Error saving hotkey:", err);
   }
 });
 
