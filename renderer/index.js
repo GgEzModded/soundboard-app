@@ -34,6 +34,7 @@ const appBody = document.body;
 const leftSettingsBtn = document.getElementById("left-settings-btn");
 const leftSettingsMenu = document.getElementById("left-settings-menu");
 const toggleLeftPanelThemeBtn = document.getElementById("toggle-left-panel-theme");
+const stopAllSoundsBtn = document.getElementById("stop-all-sounds");
 const CHARMING_THEME_CLASS = "charming-theme";
 const APP_THEME_STORAGE_KEY = "appThemeMode";
 
@@ -440,6 +441,36 @@ function unregisterAudio(audioToRemove) {
   }
 }
 
+function stopAllSounds() {
+  if (activePushLoopKeys && activePushLoopKeys.size > 0) {
+    activePushLoopKeys.forEach((card) => {
+      if (card && typeof card._stopPushLoop === "function") {
+        card._stopPushLoop();
+      }
+    });
+    activePushLoopKeys.clear();
+  }
+
+  allAudio.slice().forEach((audio) => {
+    audio.pause();
+    audio.currentTime = 0;
+    unmarkCardPlaying(audio._parentCard, audio);
+    cleanupEphemeralAudio(audio);
+  });
+
+  document.querySelectorAll(".sound-card").forEach((card) => {
+    if (card._activeInstances) {
+      card._activeInstances.clear();
+    }
+    card.classList.remove("playing");
+  });
+
+  currentPlayingAudio = null;
+  currentPlayingCard = null;
+  syncMuteOthers(null);
+  updatePanelUI();
+}
+
 function ensureCardAudioState(card) {
   if (!card) {
     return;
@@ -680,6 +711,12 @@ document.querySelectorAll('.checkbox-item').forEach(item => {
     }
   });
 });
+
+if (stopAllSoundsBtn) {
+  stopAllSoundsBtn.addEventListener("click", () => {
+    stopAllSounds();
+  });
+}
 
 if (globalVolumeSlider) {
   globalVolumeSlider.oninput = () => {

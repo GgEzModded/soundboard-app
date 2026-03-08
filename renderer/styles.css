@@ -1118,6 +1118,29 @@ h1 {
   font-size: 14px;
 }
 
+.panel-action-btn {
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: #e6e9f0;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.panel-action-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.panel-action-btn:active {
+  transform: translateY(1px);
+}
+
 .global-volume-section {
   margin-top: auto;
   background: rgba(58, 58, 58, 0.9);
@@ -1320,6 +1343,17 @@ body.charming-theme .panel-volume-slider::-webkit-slider-thumb {
 
 body.charming-theme .panel-volume-slider::-moz-range-thumb {
   background: #ff6fd7;
+}
+
+body.charming-theme .panel-action-btn {
+  border-color: rgba(255, 196, 241, 0.25);
+  background: rgba(255, 196, 241, 0.12);
+  color: #ffe9fb;
+}
+
+body.charming-theme .panel-action-btn:hover {
+  background: rgba(255, 196, 241, 0.2);
+  border-color: rgba(255, 196, 241, 0.4);
 }
 
 body.charming-theme .control-btn {
