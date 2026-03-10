@@ -11,7 +11,9 @@ let currentPlayingAudio = null;
 let currentPlayingCard = null;
 let globalVolume = 1;
 let currentReproductionMode = "play-overlap";
-const DEFAULT_APP_TITLE = "Soundboard";
+const APP_TITLE = "SoundFactory";
+const CUSTOM_PANEL_TITLE_KEY = "customPanelTitle";
+const DEFAULT_CUSTOM_PANEL_TITLE = "MyFirstSoundBoard";
 
 // Panel elements
 const audioPanel = document.getElementById("audio-panel");
@@ -162,41 +164,63 @@ if (closeWindowBtn) {
   });
 }
 
-function applyAppTitle(title) {
-  const normalizedTitle =
-    typeof title === "string" && title.trim() ? title.trim() : DEFAULT_APP_TITLE;
-
+function applyAppTitle() {
   if (titlebarTitle) {
-    titlebarTitle.textContent = normalizedTitle;
+    titlebarTitle.textContent = APP_TITLE;
+  }
+
+  if (document.title !== APP_TITLE) {
+    document.title = APP_TITLE;
   }
 }
 
-async function persistAppTitle(title) {
-  if (!window.electronAPI || !window.electronAPI.saveAppTitle) {
+applyAppTitle();
+
+function applyCustomPanelTitle(title) {
+  if (!topPanelTitle) {
+    return;
+  }
+
+  const normalizedTitle =
+    typeof title === "string" && title.trim()
+      ? title.trim()
+      : DEFAULT_CUSTOM_PANEL_TITLE;
+
+  topPanelTitle.textContent = normalizedTitle;
+}
+
+function loadCustomPanelTitle() {
+  if (!topPanelTitle) {
     return;
   }
 
   try {
-    const savedTitle = await window.electronAPI.saveAppTitle(title);
-    applyAppTitle(savedTitle);
+    const savedTitle = window.localStorage.getItem(CUSTOM_PANEL_TITLE_KEY);
+    const nextTitle = savedTitle && savedTitle.trim() ? savedTitle : DEFAULT_CUSTOM_PANEL_TITLE;
+    applyCustomPanelTitle(nextTitle);
+
+    if (!savedTitle) {
+      saveCustomPanelTitle(nextTitle);
+    }
   } catch (err) {
-    console.error("Error persisting app title:", err);
+    console.error("Unable to load custom panel title:", err);
+    applyCustomPanelTitle(DEFAULT_CUSTOM_PANEL_TITLE);
   }
 }
 
-if (window.electronAPI && window.electronAPI.loadAppTitle) {
-  window.electronAPI
-    .loadAppTitle()
-    .then((savedTitle) => applyAppTitle(savedTitle))
-    .catch((err) => {
-      console.error("Error loading app title:", err);
-      applyAppTitle(DEFAULT_APP_TITLE);
-    });
+function saveCustomPanelTitle(title) {
+  try {
+    window.localStorage.setItem(CUSTOM_PANEL_TITLE_KEY, title);
+  } catch (err) {
+    console.error("Unable to save custom panel title:", err);
+  }
 }
+
+loadCustomPanelTitle();
 
 if (topPanelTitle) {
   topPanelTitle.ondblclick = () => {
-    const previousTitle = topPanelTitle.textContent;
+    const previousTitle = topPanelTitle.textContent || "";
     const input = document.createElement("input");
     input.type = "text";
     input.value = previousTitle;
@@ -216,14 +240,13 @@ if (topPanelTitle) {
       if (shouldSave) {
         const newTitle = input.value.trim();
         if (newTitle) {
-          applyAppTitle(newTitle);
-          persistAppTitle(newTitle);
+          applyCustomPanelTitle(newTitle);
+          saveCustomPanelTitle(newTitle);
         } else {
-          applyAppTitle(previousTitle);
-          persistAppTitle(previousTitle);
+          applyCustomPanelTitle(previousTitle);
         }
       } else {
-        applyAppTitle(previousTitle);
+        applyCustomPanelTitle(previousTitle);
       }
 
       input.replaceWith(topPanelTitle);

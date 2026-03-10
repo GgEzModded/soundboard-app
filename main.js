@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, screen } = require("electron");
 const path = require("path");
 const fs = require("fs");
 
@@ -7,8 +7,8 @@ const userDataDir = app.getPath("userData");
 const localDataPath = path.join(userDataDir, "sounds.local.json");
 const legacyLocalDataPath = path.join(dataDir, "sounds.local.json");
 const exampleDataPath = path.join(dataDir, "sounds.example.json");
-const DEFAULT_APP_TITLE = "Soundboard";
-const defaultData = { sounds: [], appTitle: DEFAULT_APP_TITLE };
+const APP_TITLE = "SoundFactory";
+const defaultData = { sounds: [], appTitle: APP_TITLE };
 
 function normalizeSoundEntry(rawSound) {
   if (!rawSound || typeof rawSound !== "object") {
@@ -37,23 +37,18 @@ function normalizeData(raw) {
   if (Array.isArray(raw)) {
     return {
       sounds: raw.map(normalizeSoundEntry).filter(Boolean),
-      appTitle: DEFAULT_APP_TITLE
+      appTitle: APP_TITLE
     };
   }
 
   if (raw && Array.isArray(raw.sounds)) {
-    const appTitle =
-      typeof raw.appTitle === "string" && raw.appTitle.trim()
-        ? raw.appTitle.trim()
-        : DEFAULT_APP_TITLE;
-
     return {
       sounds: raw.sounds.map(normalizeSoundEntry).filter(Boolean),
-      appTitle
+      appTitle: APP_TITLE
     };
   }
 
-  return { sounds: [], appTitle: DEFAULT_APP_TITLE };
+  return { sounds: [], appTitle: APP_TITLE };
 }
 
 function readDataFile(filePath) {
@@ -103,7 +98,7 @@ function loadData() {
   if (exampleData) return exampleData;
 
   writeLocalData(defaultData);
-  return { sounds: [], appTitle: DEFAULT_APP_TITLE };
+  return { sounds: [], appTitle: APP_TITLE };
 }
 
 function loadWritableData() {
@@ -112,13 +107,17 @@ function loadWritableData() {
   if (localData) return localData;
 
   const exampleData = readDataFile(exampleDataPath);
-  return exampleData || { sounds: [], appTitle: DEFAULT_APP_TITLE };
+  return exampleData || { sounds: [], appTitle: APP_TITLE };
 }
 
 function createWindow() {
+  const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
+  const windowWidth = Math.round(screenWidth * 0.9);
+  const windowHeight = Math.round(screenHeight * 0.9);
+
   const win = new BrowserWindow({
-    width: 1300,
-    height: 800,
+    width: windowWidth,
+    height: windowHeight,
     frame: false,
     backgroundColor: "#070b1c",
     webPreferences: {
@@ -167,24 +166,19 @@ ipcMain.handle("load-sounds", () => {
 
 ipcMain.handle("load-app-title", () => {
   const data = loadData();
-  return data.appTitle || DEFAULT_APP_TITLE;
+  return APP_TITLE;
 });
 
 ipcMain.handle("save-app-title", (event, appTitle) => {
   try {
     const data = loadWritableData();
-    const normalizedTitle =
-      typeof appTitle === "string" && appTitle.trim()
-        ? appTitle.trim()
-        : DEFAULT_APP_TITLE;
-
-    data.appTitle = normalizedTitle;
+    data.appTitle = APP_TITLE;
     writeLocalData(data);
 
-    return normalizedTitle;
+    return APP_TITLE;
   } catch (err) {
     console.error("Error saving app title:", err);
-    return DEFAULT_APP_TITLE;
+    return APP_TITLE;
   }
 });
 
