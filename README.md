@@ -139,7 +139,8 @@ Soundboard е модерно **настолно приложение**, разр
 
 ## 📷 Скрийншотове
 
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/870584b3-4838-4bf6-813f-c79c8a4330ec" />
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/00fa329f-9027-4184-8095-6c7dbaf492e6" />
+
 
 
 ---
