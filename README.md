@@ -152,7 +152,9 @@ Soundboard е модерно **настолно приложение**, разр
 
 ## 👤 Автори
 
-*Александър Пламенов Пеев
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/Александър.png" />
-*Даниел Антонов Христов
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/Даниел.png" />
+* Александър Пламенов Пеев
+<img width="1700" height="2338" alt="Александър" src="https://github.com/user-attachments/assets/d3daa1b4-300b-44ba-b82c-8dad77c49d36" />
+
+* Даниел Антонов Христов
+<img width="1700" height="2338" alt="Даниел" src="https://github.com/user-attachments/assets/76ff2e1f-f9b9-4be5-9212-bdf2299573e1" />
+
