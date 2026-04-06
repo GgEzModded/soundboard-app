@@ -51,13 +51,32 @@ const globalVolumeDisplay = document.getElementById("global-volume-display");
 const appBody = document.body;
 const leftSettingsBtn = document.getElementById("left-settings-btn");
 const leftSettingsMenu = document.getElementById("left-settings-menu");
+const settingsLaunchStartupBtn = document.getElementById("settings-launch-startup-btn");
+const settingsLaunchStartupSwitch = document.getElementById("settings-launch-startup-switch");
+const settingsStartMinimizedBtn = document.getElementById("settings-start-minimized-btn");
+const settingsStartMinimizedSwitch = document.getElementById("settings-start-minimized-switch");
+const settingsLanguageBtn = document.getElementById("settings-language-btn");
+const settingsLanguageLabel = document.getElementById("settings-language-label");
+const settingsLanguageMenu = document.getElementById("settings-language-menu");
+const settingsLanguageOptions = Array.from(
+  document.querySelectorAll("[data-language-option]")
+);
+const leftThemeBtn = document.getElementById("left-theme-btn");
+const leftThemeMenu = document.getElementById("left-theme-menu");
 const toggleLeftPanelThemeBtn = document.getElementById("toggle-left-panel-theme");
 const stopAllSoundsBtn = document.getElementById("stop-all-sounds");
 const CHARMING_THEME_CLASS = "charming-theme";
 const APP_THEME_STORAGE_KEY = "appThemeMode";
+const DEFAULT_APP_SETTINGS = Object.freeze({
+  launchAtStartup: false,
+  startMinimized: false,
+  language: "English"
+});
+const SUPPORTED_APP_LANGUAGES = ["English", "Bulgarian", "German"];
 const MIN_SIDE_PANEL_SCALE = 0.4;
 const MAX_SIDE_PANEL_SCALE = 1;
 let sidePanelScaleFrame = 0;
+let appSettings = { ...DEFAULT_APP_SETTINGS };
 
 function normalizePlaybackSettings(rawSettings) {
   const settings =
@@ -80,6 +99,29 @@ function normalizePlaybackSettings(rawSettings) {
       typeof settings.loopCurrent === "boolean"
         ? settings.loopCurrent
         : DEFAULT_SOUND_PLAYBACK_SETTINGS.loopCurrent
+  };
+}
+
+function normalizeAppLanguage(rawLanguage) {
+  return SUPPORTED_APP_LANGUAGES.includes(rawLanguage)
+    ? rawLanguage
+    : DEFAULT_APP_SETTINGS.language;
+}
+
+function normalizeAppSettings(rawSettings) {
+  const settings =
+    rawSettings && typeof rawSettings === "object" ? rawSettings : {};
+
+  return {
+    launchAtStartup:
+      typeof settings.launchAtStartup === "boolean"
+        ? settings.launchAtStartup
+        : DEFAULT_APP_SETTINGS.launchAtStartup,
+    startMinimized:
+      typeof settings.startMinimized === "boolean"
+        ? settings.startMinimized
+        : DEFAULT_APP_SETTINGS.startMinimized,
+    language: normalizeAppLanguage(settings.language)
   };
 }
 
@@ -239,16 +281,115 @@ function scheduleSidePanelScale() {
   });
 }
 
-function setLeftSettingsMenuOpen(isOpen) {
-  if (!leftSettingsMenu) {
+function setQuickPanelMenuOpen(button, menu, isOpen) {
+  if (!button || !menu) {
     return;
   }
 
-  leftSettingsMenu.classList.toggle("is-open", isOpen);
-  leftSettingsMenu.setAttribute("aria-hidden", String(!isOpen));
-  if (leftSettingsBtn) {
-    leftSettingsBtn.setAttribute("aria-expanded", String(isOpen));
+  menu.classList.toggle("is-open", isOpen);
+  menu.setAttribute("aria-hidden", String(!isOpen));
+  button.setAttribute("aria-expanded", String(isOpen));
+}
+
+function setSettingsLanguageMenuOpen(isOpen) {
+  if (!settingsLanguageBtn || !settingsLanguageMenu) {
+    return;
   }
+
+  settingsLanguageMenu.classList.toggle("is-open", isOpen);
+  settingsLanguageMenu.setAttribute("aria-hidden", String(!isOpen));
+  settingsLanguageBtn.setAttribute("aria-expanded", String(isOpen));
+}
+
+function closeQuickPanelMenus() {
+  setSettingsLanguageMenuOpen(false);
+  setQuickPanelMenuOpen(leftSettingsBtn, leftSettingsMenu, false);
+  setQuickPanelMenuOpen(leftThemeBtn, leftThemeMenu, false);
+}
+
+function syncAppSettingsControls() {
+  appSettings = normalizeAppSettings(appSettings);
+
+  if (settingsLaunchStartupBtn) {
+    settingsLaunchStartupBtn.setAttribute(
+      "aria-pressed",
+      String(appSettings.launchAtStartup)
+    );
+  }
+
+  if (settingsLaunchStartupSwitch) {
+    settingsLaunchStartupSwitch.classList.toggle(
+      "is-on",
+      appSettings.launchAtStartup
+    );
+  }
+
+  if (settingsStartMinimizedBtn) {
+    settingsStartMinimizedBtn.setAttribute(
+      "aria-pressed",
+      String(appSettings.startMinimized)
+    );
+  }
+
+  if (settingsStartMinimizedSwitch) {
+    settingsStartMinimizedSwitch.classList.toggle(
+      "is-on",
+      appSettings.startMinimized
+    );
+  }
+
+  if (settingsLanguageLabel) {
+    settingsLanguageLabel.textContent = appSettings.language;
+  }
+
+  settingsLanguageOptions.forEach((option) => {
+    const isActive = option.dataset.languageOption === appSettings.language;
+    option.classList.toggle("is-active", isActive);
+    option.setAttribute("aria-pressed", String(isActive));
+  });
+}
+
+async function persistAppSettings(nextPartialSettings) {
+  const nextSettings = normalizeAppSettings({
+    ...appSettings,
+    ...(nextPartialSettings && typeof nextPartialSettings === "object"
+      ? nextPartialSettings
+      : {})
+  });
+
+  appSettings = nextSettings;
+  syncAppSettingsControls();
+
+  if (!window.electronAPI?.saveAppSettings) {
+    return appSettings;
+  }
+
+  try {
+    const savedSettings = await window.electronAPI.saveAppSettings(nextSettings);
+    appSettings = normalizeAppSettings(savedSettings);
+  } catch (err) {
+    console.error("Unable to save app settings:", err);
+  }
+
+  syncAppSettingsControls();
+  return appSettings;
+}
+
+async function loadPersistedAppSettings() {
+  if (!window.electronAPI?.loadAppSettings) {
+    syncAppSettingsControls();
+    return appSettings;
+  }
+
+  try {
+    const loadedSettings = await window.electronAPI.loadAppSettings();
+    appSettings = normalizeAppSettings(loadedSettings);
+  } catch (err) {
+    console.error("Unable to load app settings:", err);
+  }
+
+  syncAppSettingsControls();
+  return appSettings;
 }
 
 function updateLeftPanelThemeButtonLabel() {
@@ -290,41 +431,107 @@ if (toggleLeftPanelThemeBtn && appBody) {
   });
 }
 
-if (leftSettingsBtn && leftSettingsMenu) {
-  setLeftSettingsMenuOpen(false);
+if (leftSettingsBtn && leftSettingsMenu && leftThemeBtn && leftThemeMenu) {
+  closeQuickPanelMenus();
 
   leftSettingsBtn.addEventListener("click", (event) => {
     event.stopPropagation();
     const shouldOpen = !leftSettingsMenu.classList.contains("is-open");
-    setLeftSettingsMenuOpen(shouldOpen);
+    closeQuickPanelMenus();
+    setQuickPanelMenuOpen(leftSettingsBtn, leftSettingsMenu, shouldOpen);
+  });
+
+  leftThemeBtn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    const shouldOpen = !leftThemeMenu.classList.contains("is-open");
+    closeQuickPanelMenus();
+    setQuickPanelMenuOpen(leftThemeBtn, leftThemeMenu, shouldOpen);
+  });
+
+  if (settingsLaunchStartupBtn) {
+    settingsLaunchStartupBtn.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      await persistAppSettings({
+        launchAtStartup: !appSettings.launchAtStartup
+      });
+    });
+  }
+
+  if (settingsStartMinimizedBtn) {
+    settingsStartMinimizedBtn.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      await persistAppSettings({
+        startMinimized: !appSettings.startMinimized
+      });
+    });
+  }
+
+  if (settingsLanguageBtn && settingsLanguageMenu) {
+    settingsLanguageBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const shouldOpen = !settingsLanguageMenu.classList.contains("is-open");
+      setSettingsLanguageMenuOpen(shouldOpen);
+    });
+  }
+
+  settingsLanguageOptions.forEach((option) => {
+    option.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      const selectedLanguage = option.dataset.languageOption;
+      if (!selectedLanguage) {
+        return;
+      }
+
+      setSettingsLanguageMenuOpen(false);
+      await persistAppSettings({
+        language: selectedLanguage
+      });
+    });
   });
 
   document.addEventListener("click", (event) => {
-    if (!leftSettingsMenu.classList.contains("is-open")) {
-      return;
-    }
-
     const target = event.target;
     if (!(target instanceof Node)) {
-      setLeftSettingsMenuOpen(false);
+      closeQuickPanelMenus();
       return;
     }
 
-    if (leftSettingsMenu.contains(target) || leftSettingsBtn.contains(target)) {
+    const clickedInsideQuickPanelMenu =
+      leftSettingsMenu.contains(target) ||
+      leftSettingsBtn.contains(target) ||
+      leftThemeMenu.contains(target) ||
+      leftThemeBtn.contains(target);
+
+    const clickedInsideLanguageControl =
+      (settingsLanguageBtn && settingsLanguageBtn.contains(target)) ||
+      (settingsLanguageMenu && settingsLanguageMenu.contains(target));
+
+    if (!clickedInsideLanguageControl) {
+      setSettingsLanguageMenuOpen(false);
+    }
+
+    if (clickedInsideQuickPanelMenu) {
       return;
     }
 
-    setLeftSettingsMenuOpen(false);
+    closeQuickPanelMenus();
   });
 
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && leftSettingsMenu.classList.contains("is-open")) {
-      setLeftSettingsMenuOpen(false);
+    if (event.key === "Escape") {
+      if (settingsLanguageMenu?.classList.contains("is-open")) {
+        setSettingsLanguageMenuOpen(false);
+        return;
+      }
+
+      closeQuickPanelMenus();
     }
   });
 }
 
 updateLeftPanelThemeButtonLabel();
+syncAppSettingsControls();
+loadPersistedAppSettings();
 
 if (minimizeWindowBtn) {
   minimizeWindowBtn.addEventListener("click", () => {

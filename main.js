@@ -9,7 +9,17 @@ const legacyLocalDataPath = path.join(dataDir, "sounds.local.json");
 const exampleDataPath = path.join(dataDir, "sounds.example.json");
 const appIconPath = path.join(__dirname, "Assets", "Logo.png");
 const APP_TITLE = "SoundFactory";
-const defaultData = { sounds: [], appTitle: APP_TITLE };
+const SUPPORTED_APP_LANGUAGES = ["English", "Bulgarian", "German"];
+const DEFAULT_APP_SETTINGS = Object.freeze({
+  launchAtStartup: false,
+  startMinimized: false,
+  language: "English"
+});
+const defaultData = {
+  sounds: [],
+  appTitle: APP_TITLE,
+  appSettings: { ...DEFAULT_APP_SETTINGS }
+};
 const DEFAULT_PLAYBACK_SETTINGS = Object.freeze({
   reproductionMode: "play-stop",
   stopOtherSounds: true,
@@ -54,6 +64,29 @@ function normalizeImagePath(rawImagePath) {
     : "";
 }
 
+function normalizeAppLanguage(rawLanguage) {
+  return SUPPORTED_APP_LANGUAGES.includes(rawLanguage)
+    ? rawLanguage
+    : DEFAULT_APP_SETTINGS.language;
+}
+
+function normalizeAppSettings(rawSettings) {
+  const settings =
+    rawSettings && typeof rawSettings === "object" ? rawSettings : {};
+
+  return {
+    launchAtStartup:
+      typeof settings.launchAtStartup === "boolean"
+        ? settings.launchAtStartup
+        : DEFAULT_APP_SETTINGS.launchAtStartup,
+    startMinimized:
+      typeof settings.startMinimized === "boolean"
+        ? settings.startMinimized
+        : DEFAULT_APP_SETTINGS.startMinimized,
+    language: normalizeAppLanguage(settings.language)
+  };
+}
+
 function normalizeSoundEntry(rawSound) {
   if (!rawSound || typeof rawSound !== "object") {
     return null;
@@ -83,25 +116,32 @@ function normalizeData(raw) {
   if (Array.isArray(raw)) {
     return {
       sounds: raw.map(normalizeSoundEntry).filter(Boolean),
-      appTitle: APP_TITLE
+      appTitle: APP_TITLE,
+      appSettings: normalizeAppSettings()
     };
   }
 
   if (raw && Array.isArray(raw.sounds)) {
     return {
       sounds: raw.sounds.map(normalizeSoundEntry).filter(Boolean),
-      appTitle: APP_TITLE
+      appTitle: APP_TITLE,
+      appSettings: normalizeAppSettings(raw.appSettings)
     };
   }
 
   if (raw && Array.isArray(raw.pages)) {
     return {
       sounds: (raw.pages[0]?.sounds || []).map(normalizeSoundEntry).filter(Boolean),
-      appTitle: APP_TITLE
+      appTitle: APP_TITLE,
+      appSettings: normalizeAppSettings(raw.appSettings)
     };
   }
 
-  return { sounds: [], appTitle: APP_TITLE };
+  return {
+    sounds: [],
+    appTitle: APP_TITLE,
+    appSettings: normalizeAppSettings()
+  };
 }
 
 function readDataFile(filePath) {
@@ -151,7 +191,11 @@ function loadData() {
   if (exampleData) return exampleData;
 
   writeLocalData(defaultData);
-  return { sounds: [], appTitle: APP_TITLE };
+  return {
+    sounds: [],
+    appTitle: APP_TITLE,
+    appSettings: normalizeAppSettings()
+  };
 }
 
 function loadWritableData() {
@@ -160,21 +204,41 @@ function loadWritableData() {
   if (localData) return localData;
 
   const exampleData = readDataFile(exampleDataPath);
-  return exampleData || { sounds: [], appTitle: APP_TITLE };
+  return exampleData || {
+    sounds: [],
+    appTitle: APP_TITLE,
+    appSettings: normalizeAppSettings()
+  };
+}
+
+function applyLaunchAtStartupSetting(enabled) {
+  try {
+    if (process.platform === "win32" || process.platform === "darwin") {
+      app.setLoginItemSettings({
+        openAtLogin: Boolean(enabled)
+      });
+    }
+  } catch (err) {
+    console.error("Error applying launch at startup setting:", err);
+  }
 }
 
 function createWindow() {
+  const data = loadData();
+  const appSettings = normalizeAppSettings(data.appSettings);
   const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
   const windowWidth = Math.round(screenWidth * 0.9);
   const windowHeight = Math.round(screenHeight * 0.95);
   const minWidth = Math.round(screenWidth * 0.65);
   const minHeight = Math.round(screenHeight * 0.65);
+  const shouldStartMinimized = appSettings.startMinimized;
 
   const win = new BrowserWindow({
     width: windowWidth,
     height: windowHeight,
     minWidth,
     minHeight,
+    show: !shouldStartMinimized,
     frame: false,
     icon: appIconPath,
     backgroundColor: "#070b1c",
@@ -184,6 +248,13 @@ function createWindow() {
   });
 
   win.loadFile("renderer/index.html");
+
+  if (shouldStartMinimized) {
+    win.once("ready-to-show", () => {
+      win.show();
+      win.minimize();
+    });
+  }
 
   win.on("maximize", () => {
     win.webContents.send("window-maximized", true);
@@ -233,6 +304,11 @@ ipcMain.handle("load-app-title", () => {
   return APP_TITLE;
 });
 
+ipcMain.handle("load-app-settings", () => {
+  const data = loadData();
+  return normalizeAppSettings(data.appSettings);
+});
+
 ipcMain.handle("save-app-title", (event, appTitle) => {
   try {
     const data = loadWritableData();
@@ -243,6 +319,23 @@ ipcMain.handle("save-app-title", (event, appTitle) => {
   } catch (err) {
     console.error("Error saving app title:", err);
     return APP_TITLE;
+  }
+});
+
+ipcMain.handle("save-app-settings", (event, appSettings) => {
+  try {
+    const data = loadWritableData();
+    const nextSettings = normalizeAppSettings({
+      ...data.appSettings,
+      ...(appSettings && typeof appSettings === "object" ? appSettings : {})
+    });
+    data.appSettings = nextSettings;
+    writeLocalData(data);
+    applyLaunchAtStartupSetting(nextSettings.launchAtStartup);
+    return nextSettings;
+  } catch (err) {
+    console.error("Error saving app settings:", err);
+    return normalizeAppSettings();
   }
 });
 
@@ -360,7 +453,11 @@ ipcMain.handle("window-is-maximized", (event) => {
   return win ? win.isMaximized() : false;
 });
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  const data = loadData();
+  applyLaunchAtStartupSetting(normalizeAppSettings(data.appSettings).launchAtStartup);
+  createWindow();
+});
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
