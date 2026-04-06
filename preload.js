@@ -10,6 +10,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("rename-sound", filePath, newName),
   saveSoundHotkey: (filePath, hotkey) =>
     ipcRenderer.invoke("save-sound-hotkey", filePath, hotkey),
+  saveSoundPlaybackSettings: (filePath, playbackSettings) =>
+    ipcRenderer.invoke("save-sound-playback-settings", filePath, playbackSettings),
+  selectSoundImage: () => ipcRenderer.invoke("select-sound-image"),
+  saveSoundImage: (filePath, imagePath) =>
+    ipcRenderer.invoke("save-sound-image", filePath, imagePath),
   closeWindow: () => ipcRenderer.send("window-close"),
   minimizeWindow: () => ipcRenderer.send("window-minimize"),
   toggleMaximize: () => ipcRenderer.send("window-toggle-maximize"),

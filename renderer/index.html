@@ -48,13 +48,25 @@
   </div>
 
   <aside id="side-panel">
-    <div id="audio-panel" class="audio-panel hidden">
+    <div id="audio-panel" class="audio-panel">
       <div class="icon-section">
-        <div style="position: relative; display: inline-block;">
+        <div class="panel-image-row">
           <div class="sound-icon">
-            <div class="speaker-icon"></div>
+            <img
+              id="panel-sound-image"
+              class="panel-sound-image is-placeholder"
+              alt=""
+              draggable="false"
+            >
           </div>
-          <div class="edit-icon"></div>
+          <button
+            type="button"
+            class="edit-icon"
+            id="panel-image-edit-button"
+            aria-label="Change sound image"
+            title="Select a soundcard to change its image"
+            disabled
+          ></button>
         </div>
         <div class="shortcut" id="current-sound-name">No Sound Playing</div>
       </div>
@@ -76,9 +88,9 @@
         <div class="mode-toggle-group" role="radiogroup" aria-label="Reproduction mode">
           <button
             type="button"
-            class="mode-toggle is-active"
+            class="mode-toggle"
             role="radio"
-            aria-checked="true"
+            aria-checked="false"
             data-mode="play-overlap"
           >
             <span class="mode-icon">
@@ -107,9 +119,9 @@
           </button>
           <button
             type="button"
-            class="mode-toggle"
+            class="mode-toggle is-active"
             role="radio"
-            aria-checked="false"
+            aria-checked="true"
             data-mode="play-stop"
           >
             <span class="mode-icon">

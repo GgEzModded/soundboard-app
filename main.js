@@ -7,8 +7,52 @@ const userDataDir = app.getPath("userData");
 const localDataPath = path.join(userDataDir, "sounds.local.json");
 const legacyLocalDataPath = path.join(dataDir, "sounds.local.json");
 const exampleDataPath = path.join(dataDir, "sounds.example.json");
+const appIconPath = path.join(__dirname, "Assets", "Logo.png");
 const APP_TITLE = "SoundFactory";
 const defaultData = { sounds: [], appTitle: APP_TITLE };
+const DEFAULT_PLAYBACK_SETTINGS = Object.freeze({
+  reproductionMode: "play-stop",
+  stopOtherSounds: true,
+  muteOtherSounds: false,
+  loopCurrent: false
+});
+const VALID_REPRODUCTION_MODES = new Set([
+  "play-overlap",
+  "play-pause",
+  "play-stop",
+  "play-restart",
+  "push-loop"
+]);
+
+function normalizePlaybackSettings(rawSettings) {
+  const settings =
+    rawSettings && typeof rawSettings === "object" ? rawSettings : {};
+  const reproductionMode = VALID_REPRODUCTION_MODES.has(settings.reproductionMode)
+    ? settings.reproductionMode
+    : DEFAULT_PLAYBACK_SETTINGS.reproductionMode;
+
+  return {
+    reproductionMode,
+    stopOtherSounds:
+      typeof settings.stopOtherSounds === "boolean"
+        ? settings.stopOtherSounds
+        : DEFAULT_PLAYBACK_SETTINGS.stopOtherSounds,
+    muteOtherSounds:
+      typeof settings.muteOtherSounds === "boolean"
+        ? settings.muteOtherSounds
+        : DEFAULT_PLAYBACK_SETTINGS.muteOtherSounds,
+    loopCurrent:
+      typeof settings.loopCurrent === "boolean"
+        ? settings.loopCurrent
+        : DEFAULT_PLAYBACK_SETTINGS.loopCurrent
+  };
+}
+
+function normalizeImagePath(rawImagePath) {
+  return typeof rawImagePath === "string" && rawImagePath.trim()
+    ? rawImagePath.trim()
+    : "";
+}
 
 function normalizeSoundEntry(rawSound) {
   if (!rawSound || typeof rawSound !== "object") {
@@ -29,7 +73,9 @@ function normalizeSoundEntry(rawSound) {
     hotkey:
       typeof rawSound.hotkey === "string" && rawSound.hotkey.trim()
         ? rawSound.hotkey.trim()
-        : ""
+        : "",
+    playbackSettings: normalizePlaybackSettings(rawSound.playbackSettings),
+    imagePath: normalizeImagePath(rawSound.imagePath)
   };
 }
 
@@ -44,6 +90,13 @@ function normalizeData(raw) {
   if (raw && Array.isArray(raw.sounds)) {
     return {
       sounds: raw.sounds.map(normalizeSoundEntry).filter(Boolean),
+      appTitle: APP_TITLE
+    };
+  }
+
+  if (raw && Array.isArray(raw.pages)) {
+    return {
+      sounds: (raw.pages[0]?.sounds || []).map(normalizeSoundEntry).filter(Boolean),
       appTitle: APP_TITLE
     };
   }
@@ -113,12 +166,17 @@ function loadWritableData() {
 function createWindow() {
   const { width: screenWidth, height: screenHeight } = screen.getPrimaryDisplay().workAreaSize;
   const windowWidth = Math.round(screenWidth * 0.9);
-  const windowHeight = Math.round(screenHeight * 0.9);
+  const windowHeight = Math.round(screenHeight * 0.95);
+  const minWidth = Math.round(screenWidth * 0.65);
+  const minHeight = Math.round(screenHeight * 0.65);
 
   const win = new BrowserWindow({
     width: windowWidth,
     height: windowHeight,
+    minWidth,
+    minHeight,
     frame: false,
+    icon: appIconPath,
     backgroundColor: "#070b1c",
     webPreferences: {
       preload: path.join(__dirname, "preload.js")
@@ -149,7 +207,13 @@ ipcMain.handle("add-sound", async () => {
   const data = loadWritableData();
   const added = result.filePaths.map((filePath) => {
     const name = path.parse(filePath).name;
-    const soundEntry = { name, filePath, hotkey: "" };
+    const soundEntry = {
+      name,
+      filePath,
+      hotkey: "",
+      playbackSettings: normalizePlaybackSettings(),
+      imagePath: ""
+    };
     data.sounds.push(soundEntry);
     return soundEntry;
   });
@@ -185,7 +249,7 @@ ipcMain.handle("save-app-title", (event, appTitle) => {
 ipcMain.handle("remove-sound", (event, filePath) => {
   try {
     const data = loadWritableData();
-    const index = data.sounds.findIndex(sound => sound.filePath === filePath);
+    const index = data.sounds.findIndex((sound) => sound.filePath === filePath);
     if (index === -1) return;
     data.sounds.splice(index, 1);
 
@@ -199,7 +263,7 @@ ipcMain.handle("rename-sound", (event, filePath, newName) => {
   try {
     const data = loadWritableData();
 
-    const sound = data.sounds.find(s => s.filePath === filePath);
+    const sound = data.sounds.find((s) => s.filePath === filePath);
     if (sound) {
       sound.name = newName;
     }
@@ -223,6 +287,51 @@ ipcMain.handle("save-sound-hotkey", (event, filePath, hotkey) => {
     writeLocalData(data);
   } catch (err) {
     console.error("Error saving hotkey:", err);
+  }
+});
+
+ipcMain.handle("save-sound-playback-settings", (event, filePath, playbackSettings) => {
+  try {
+    const data = loadWritableData();
+    const sound = data.sounds.find((entry) => entry.filePath === filePath);
+    if (!sound) {
+      return;
+    }
+
+    sound.playbackSettings = normalizePlaybackSettings(playbackSettings);
+    writeLocalData(data);
+  } catch (err) {
+    console.error("Error saving sound playback settings:", err);
+  }
+});
+
+ipcMain.handle("select-sound-image", async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ["openFile"],
+    filters: [
+      { name: "Image Files", extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp"] }
+    ]
+  });
+
+  if (result.canceled || !result.filePaths[0]) {
+    return null;
+  }
+
+  return result.filePaths[0];
+});
+
+ipcMain.handle("save-sound-image", (event, filePath, imagePath) => {
+  try {
+    const data = loadWritableData();
+    const sound = data.sounds.find((entry) => entry.filePath === filePath);
+    if (!sound) {
+      return;
+    }
+
+    sound.imagePath = normalizeImagePath(imagePath);
+    writeLocalData(data);
+  } catch (err) {
+    console.error("Error saving sound image:", err);
   }
 });
 

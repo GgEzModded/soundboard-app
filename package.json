@@ -22,9 +22,9 @@
       "!node_modules/.cache",
       "!data/sounds.local.json"
     ],
-    "icon": "build/icon.png",
+    "icon": "Assets/Logo.png",
     "win": {
-      "icon": "build/icon.ico",
+      "icon": "Assets/Logo.png",
       "target": [
         "nsis",
         "portable"
